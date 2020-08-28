@@ -1,4 +1,4 @@
-package com.example.miracle
+package com.digroove
 
 import io.flutter.embedding.android.FlutterActivity
 

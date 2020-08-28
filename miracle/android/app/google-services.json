@@ -10,7 +10,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:343917428926:android:54714618d1ad4a8df5deef",
         "android_client_info": {
-          "package_name": "com.example.miracle"
+          "package_name": "com.digroove"
         }
       },
       "oauth_client": [
@@ -18,7 +18,7 @@
           "client_id": "343917428926-d7ies00q2t37k8lv28ocbh69kntnnjaq.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.example.miracle",
+            "package_name": "com.digroove",
             "certificate_hash": "f1f4f731679b75c1851f3521e2f76582883998de"
           }
         },
