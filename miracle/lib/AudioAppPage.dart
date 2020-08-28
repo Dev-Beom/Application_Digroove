@@ -90,7 +90,7 @@ class _AudioAppPageState extends State<AudioAppPage> {
       appBar: AppBar(
         title: Image.asset(
           "assets/images/digrooveLogo.png",
-          scale: 35,
+          scale: 20,
         ),
         centerTitle: true,
         backgroundColor: Color(0xff192028),
