@@ -1014,55 +1014,57 @@ class _AudioAppPageState extends State<AudioAppPage> {
             SizedBox(
               height: 5,
             ),
-            Container(
-              margin: EdgeInsets.symmetric(vertical: 0.0),
-              height: 130.0,
-              child: ListView(
-                scrollDirection: Axis.vertical,
-                children: <Widget>[
-                  _buildListTile(
-                    index: 1,
-                    title: "Girls Like You",
-                    singer: "Maroon 5",
-                    imageUrl:
-                        "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FMaroon%205%20-%20%20Girls%20Like%20You.png?alt=media&token=c0915d6e-2cf6-44df-9bfc-fbccb93b2348",
-                  ),
-                  _buildListTile(
-                    index: 2,
-                    title: "I Do",
-                    singer: "John Legend",
-                    imageUrl:
-                        "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FJohn%20Legend%20-%20I%20Do.jpg?alt=media&token=b67e1f3a-c256-4b6e-b4e7-60080d34a266",
-                  ),
-                  _buildListTile(
-                    index: 3,
-                    title: "Forgive Myself",
-                    singer: "Griff",
-                    imageUrl:
-                        "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FGriff%20-%20Forgive%20Myself.jpg?alt=media&token=81005c7e-47b8-4038-a952-3e3e5b4f67c4",
-                  ),
-                  _buildListTile(
-                    index: 4,
-                    title: "Rain On Me",
-                    singer: "Lady Gaga, Ariana Grande",
-                    imageUrl:
-                        "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FLady%20Gaga%2C%20Ariana%20Grande%20-%20Rain%20On%20Me.png?alt=media&token=79799d23-a897-46ae-b51e-fe7173e42426",
-                  ),
-                  _buildListTile(
-                    index: 5,
-                    title: "Feel",
-                    singer: "Lindsey Lomis",
-                    imageUrl:
-                        "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FLindsey%20Lomis%20-%20Feel.jpg?alt=media&token=a7ab02e1-d041-499d-93b1-6a74e536bcec",
-                  ),
-                  // _buildListTile(index: 2),
-                  // _buildListTile(index: 3),
-                  // _buildListTile(index: 4),
-                  // _buildListTile(index: 5),
-                  // _buildListTile(index: 6),
-                ],
-              ),
-            )
+            playImg != ""
+                ? Container(
+                    margin: EdgeInsets.symmetric(vertical: 0.0),
+                    height: 130.0,
+                    child: ListView(
+                      scrollDirection: Axis.vertical,
+                      children: <Widget>[
+                        _buildListTile(
+                          index: 1,
+                          title: "Girls Like You",
+                          singer: "Maroon 5",
+                          imageUrl:
+                              "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FMaroon%205%20-%20%20Girls%20Like%20You.png?alt=media&token=c0915d6e-2cf6-44df-9bfc-fbccb93b2348",
+                        ),
+                        _buildListTile(
+                          index: 2,
+                          title: "I Do",
+                          singer: "John Legend",
+                          imageUrl:
+                              "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FJohn%20Legend%20-%20I%20Do.jpg?alt=media&token=b67e1f3a-c256-4b6e-b4e7-60080d34a266",
+                        ),
+                        _buildListTile(
+                          index: 3,
+                          title: "Forgive Myself",
+                          singer: "Griff",
+                          imageUrl:
+                              "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FGriff%20-%20Forgive%20Myself.jpg?alt=media&token=81005c7e-47b8-4038-a952-3e3e5b4f67c4",
+                        ),
+                        _buildListTile(
+                          index: 4,
+                          title: "Rain On Me",
+                          singer: "Lady Gaga, Ariana Grande",
+                          imageUrl:
+                              "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FLady%20Gaga%2C%20Ariana%20Grande%20-%20Rain%20On%20Me.png?alt=media&token=79799d23-a897-46ae-b51e-fe7173e42426",
+                        ),
+                        _buildListTile(
+                          index: 5,
+                          title: "Feel",
+                          singer: "Lindsey Lomis",
+                          imageUrl:
+                              "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FLindsey%20Lomis%20-%20Feel.jpg?alt=media&token=a7ab02e1-d041-499d-93b1-6a74e536bcec",
+                        ),
+                        // _buildListTile(index: 2),
+                        // _buildListTile(index: 3),
+                        // _buildListTile(index: 4),
+                        // _buildListTile(index: 5),
+                        // _buildListTile(index: 6),
+                      ],
+                    ),
+                  )
+                : Container(),
           ],
         ),
       ),
