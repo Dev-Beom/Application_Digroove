@@ -1,24 +1,18 @@
 import 'dart:async';
-import 'dart:io';
-import 'dart:typed_data';
+import 'dart:ffi';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:marquee/marquee.dart';
-import 'package:audioplayer/audioplayer.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart';
 import 'package:miracle/data/userData.dart';
 import 'package:miracle/marquee.dart';
 import 'package:miracle/utils/firebase_auth.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
 typedef void OnError(Exception exception);
-
-var kUrl =
-    "https://www.mediacollege.com/downloads/sound-effects/nature/forest/rainforest-ambient.mp3";
 
 enum PlayerState { stopped, playing, paused }
 
@@ -29,28 +23,11 @@ class AudioAppPage extends StatefulWidget {
 }
 
 class _AudioAppPageState extends State<AudioAppPage> {
-  Duration duration;
-  Duration position;
-
-  AudioPlayer audioPlayer;
-
-  String localFilePath;
+  var kUrl;
 
   PlayerState playerState = PlayerState.stopped;
 
   get isPlaying => playerState == PlayerState.playing;
-  get isPaused => playerState == PlayerState.paused;
-
-  get durationText =>
-      duration != null ? duration.toString().split('.').first : '';
-
-  get positionText =>
-      position != null ? position.toString().split('.').first : '';
-
-  bool isMuted = false;
-
-  StreamSubscription _positionSubscription;
-  StreamSubscription _audioPlayerStateSubscription;
 
   bool loopPlay = false;
   Color themeColor = Color(0xff313842);
@@ -68,6 +45,8 @@ class _AudioAppPageState extends State<AudioAppPage> {
   String playTitle = "";
   String playSinger = "";
   String playAvatar = "";
+  String playImg = "";
+  String playRunningtime = "";
 
   //컬렉션 명
   final String colName = "FirstDemo";
@@ -82,7 +61,6 @@ class _AudioAppPageState extends State<AudioAppPage> {
   @override
   void initState() {
     super.initState();
-    initAudioPlayer();
     pageIndex = 0;
     homeButtonState = true;
     musicButtonState = false;
@@ -90,99 +68,17 @@ class _AudioAppPageState extends State<AudioAppPage> {
     moreButtonState = false;
   }
 
-  @override
-  void dispose() {
-    _positionSubscription.cancel();
-    _audioPlayerStateSubscription.cancel();
-    audioPlayer.stop();
-    super.dispose();
-  }
-
-  void initAudioPlayer() {
-    audioPlayer = AudioPlayer();
-    _positionSubscription = audioPlayer.onAudioPositionChanged
-        .listen((p) => setState(() => position = p));
-    _audioPlayerStateSubscription =
-        audioPlayer.onPlayerStateChanged.listen((s) {
-      if (s == AudioPlayerState.PLAYING) {
-        setState(() => duration = audioPlayer.duration);
-      } else if (s == AudioPlayerState.STOPPED) {
-        onComplete();
-        setState(() {
-          position = duration;
-        });
-      }
-    }, onError: (msg) {
-      setState(() {
-        playerState = PlayerState.stopped;
-        duration = Duration(seconds: 0);
-        position = Duration(seconds: 0);
-      });
-    });
-  }
-
-  Future play() async {
-    await audioPlayer.play(kUrl);
-    setState(() {
-      playerState = PlayerState.playing;
-    });
-  }
-
-  Future _playLocal() async {
-    await audioPlayer.play(localFilePath, isLocal: true);
-    setState(() => playerState = PlayerState.playing);
-  }
-
-  Future pause() async {
-    await audioPlayer.pause();
-    setState(() => playerState = PlayerState.paused);
-  }
-
-  Future stop() async {
-    await audioPlayer.stop();
-    setState(() {
-      playerState = PlayerState.stopped;
-      position = Duration();
-    });
-  }
-
-  Future mute(bool muted) async {
-    await audioPlayer.mute(muted);
-    setState(() {
-      isMuted = muted;
-    });
-  }
-
-  void onComplete() {
-    setState(() => playerState = PlayerState.stopped);
-  }
-
-  Future<Uint8List> _loadFileBytes(String url, {OnError onError}) async {
-    Uint8List bytes;
-    try {
-      bytes = await readBytes(url);
-    } on ClientException {
-      rethrow;
-    }
-    return bytes;
-  }
-
-  Future _loadFile() async {
-    final bytes = await _loadFileBytes(kUrl,
-        onError: (Exception exception) =>
-            print('_loadFile => exception $exception'));
-
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/audio.mp3');
-
-    await file.writeAsBytes(bytes);
-    if (await file.exists())
-      setState(() {
-        localFilePath = file.path;
-      });
-  }
-
   UserData userData;
+
+  AudioPlayer audioPlayer = new AudioPlayer();
+  Duration duration = new Duration();
+  Duration position = new Duration();
+
+  bool playing = false;
+
+  bool starState = false;
+
+  final scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   Widget build(BuildContext context) {
@@ -190,10 +86,11 @@ class _AudioAppPageState extends State<AudioAppPage> {
     userName = userData.getLoginName;
     print(userName);
     return Scaffold(
+      key: scaffoldKey,
       appBar: AppBar(
-        title: Text(
-          "DIGROOVE",
-          style: TextStyle(fontSize: 30),
+        title: Image.asset(
+          "assets/images/digrooveLogo.png",
+          scale: 35,
         ),
         centerTitle: true,
         backgroundColor: Color(0xff192028),
@@ -233,7 +130,7 @@ class _AudioAppPageState extends State<AudioAppPage> {
               ),
             ),
           ),
-          _buildBottomPlayer(),
+          pageIndex != 0 ? _buildBottomPlayer() : SizedBox(),
           _buildBottomNavigationBar(),
         ],
       ),
@@ -242,7 +139,7 @@ class _AudioAppPageState extends State<AudioAppPage> {
 
   Widget _buildBottomPlayer() {
     return Container(
-      height: 60,
+      height: 75,
       width: double.maxFinite,
       decoration: BoxDecoration(
         color: Colors.transparent,
@@ -255,78 +152,144 @@ class _AudioAppPageState extends State<AudioAppPage> {
               offset: Offset(0.0, -1.0)),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: <Widget>[
-            SizedBox(
-              width: 10,
-            ),
-            Card(
-              elevation: 4.0,
-              shape: CircleBorder(),
-              child: CircleAvatar(
-                backgroundColor: Colors.grey[800],
-                backgroundImage: NetworkImage(playAvatar == ""
-                    ? "https://d1csarkz8obe9u.cloudfront.net/posterpreviews/artistic-album-cover-design-template-d12ef0296af80b58363dc0deef077ecc_screen.jpg?ts=1561488440"
-                    : playAvatar),
-                radius: 20,
-              ),
-            ),
-            SizedBox(
-              width: 10,
-            ),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 180,
-                      child: Text(
-                        playSinger,
-                        style: TextStyle(fontSize: 12, color: Colors.white),
-                      ),
-                    ),
-                  ],
+      child: Column(
+        children: [
+          slider(),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                SizedBox(
+                  width: 10,
                 ),
-                Row(
+                Card(
+                    elevation: 4.0,
+                    shape: CircleBorder(),
+                    child: playAvatar != ""
+                        ? CircleAvatar(
+                            backgroundColor: Colors.grey[800],
+                            backgroundImage: NetworkImage(playAvatar),
+                            radius: 20,
+                          )
+                        : Container()),
+                SizedBox(
+                  width: 10,
+                ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 180,
-                      child: MarqueeWidget(
-                        direction: Axis.horizontal,
-                        child: Text(
-                          playTitle,
-                          style: TextStyle(
-                            fontSize: 17,
-                            color: Colors.white,
+                    Row(
+                      children: [
+                        Container(
+                          width: 180,
+                          child: Text(
+                            playSinger,
+                            style: TextStyle(fontSize: 12, color: Colors.white),
                           ),
                         ),
-                      ),
+                      ],
                     ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 180,
+                          child: MarqueeWidget(
+                            direction: Axis.horizontal,
+                            child: Text(
+                              playTitle,
+                              style: TextStyle(
+                                fontSize: 17,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
                   ],
-                )
+                ),
+                IconButton(
+                  icon: Icon(
+                    playing ? Icons.pause : Icons.play_arrow,
+                    color: Colors.white,
+                  ),
+                  onPressed: () {
+                    getAudio();
+                  },
+                ),
+                IconButton(
+                    icon: Icon(
+                      Icons.add_to_photos,
+                      color: Colors.white,
+                    ),
+                    onPressed: () {}),
               ],
             ),
-            IconButton(
-                icon: Icon(
-                  Icons.play_arrow,
-                  color: Colors.white,
-                ),
-                onPressed: () {}),
-            IconButton(
-                icon: Icon(
-                  Icons.add_to_photos,
-                  color: Colors.white,
-                ),
-                onPressed: () {}),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
+
+  Widget slider() {
+    return SliderTheme(
+      data: SliderTheme.of(context).copyWith(
+        activeTrackColor: Colors.red,
+        inactiveTrackColor: Colors.white,
+        trackHeight: 1.0,
+        thumbColor: Colors.yellow,
+        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 0.0),
+        overlayColor: Colors.purple.withAlpha(0),
+        overlayShape: RoundSliderOverlayShape(overlayRadius: 0.0),
+      ),
+      child: Slider.adaptive(
+        min: 0.0,
+        value: position.inSeconds.toDouble(),
+        max: duration.inSeconds.toDouble(),
+        onChanged: (double value) {
+          setState(() {
+            audioPlayer.seek(new Duration(seconds: value.toInt()));
+          });
+        },
+      ),
+    );
+  }
+
+  Future<void> getAudio() async {
+    var url =
+        "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/Maroon%205%20-%20%20Girls%20Like%20You.mp3?alt=media&token=aa305306-267b-45e5-9e72-859eb24902fd";
+
+    // playing is false by default
+    if (playing) {
+      //pause song
+      var res = await audioPlayer.pause();
+      if (res == 1) {
+        setState(() {
+          playing = false;
+        });
+      }
+    } else {
+      //play song
+      var res = await audioPlayer.play(url, isLocal: true);
+      if (res == 1) {
+        setState(() {
+          playing = true;
+        });
+      }
+    }
+
+    audioPlayer.onDurationChanged.listen((Duration dd) {
+      setState(() {
+        duration = dd;
+      });
+    });
+    audioPlayer.onAudioPositionChanged.listen((Duration dd) {
+      setState(() {
+        position = dd;
+      });
+    });
   }
 
   Widget _buildBottomNavigationBar() {
@@ -390,7 +353,7 @@ class _AudioAppPageState extends State<AudioAppPage> {
               }),
           IconButton(
               splashRadius: 0.1,
-              icon: Icon(Icons.more_horiz,
+              icon: Icon(Icons.person,
                   color: moreButtonState ? Colors.white : Colors.black),
               onPressed: () {
                 setState(() {
@@ -462,89 +425,6 @@ class _AudioAppPageState extends State<AudioAppPage> {
         height: height,
         color: color,
       ),
-    );
-  }
-
-  Widget _buildPlayer() => Container(
-        color: Colors.white,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              IconButton(
-                onPressed: isPlaying ? null : () => play(),
-                iconSize: 50.0,
-                icon: Icon(Icons.play_arrow),
-                color: Colors.cyan,
-              ),
-              IconButton(
-                onPressed: isPlaying ? () => pause() : null,
-                iconSize: 50.0,
-                icon: Icon(Icons.pause),
-                color: Colors.cyan,
-              ),
-              IconButton(
-                onPressed: isPlaying || isPaused ? () => stop() : null,
-                iconSize: 50.0,
-                icon: Icon(Icons.stop),
-                color: Colors.cyan,
-              ),
-            ]),
-            if (duration != null)
-              Slider(
-                value: position?.inMilliseconds?.toDouble() ?? 0.0,
-                onChanged: (double value) {
-                  return audioPlayer.seek((value / 1000).roundToDouble());
-                },
-                min: 0.0,
-                max: duration.inMilliseconds.toDouble(),
-              ),
-            // if (position != null) _buildMuteButtons(),
-            // if (position != null) _buildProgressView()
-          ],
-        ),
-      );
-
-  Row _buildProgressView() => Row(mainAxisSize: MainAxisSize.min, children: [
-        Padding(
-          padding: EdgeInsets.all(12.0),
-          child: CircularProgressIndicator(
-            value: position != null && position.inMilliseconds > 0
-                ? (position?.inMilliseconds?.toDouble() ?? 0.0) /
-                    (duration?.inMilliseconds?.toDouble() ?? 0.0)
-                : 0.0,
-            valueColor: AlwaysStoppedAnimation(Colors.cyan),
-            backgroundColor: Colors.grey.shade400,
-          ),
-        ),
-        Text(
-          position != null
-              ? "${positionText ?? ''} / ${durationText ?? ''}"
-              : duration != null ? durationText : '',
-          style: TextStyle(fontSize: 10.0),
-        )
-      ]);
-
-  Row _buildMuteButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: <Widget>[
-        if (!isMuted)
-          FlatButton.icon(
-            onPressed: () => mute(true),
-            icon: Icon(
-              Icons.headset_off,
-              color: Colors.cyan,
-            ),
-            label: Text('Mute', style: TextStyle(color: Colors.cyan)),
-          ),
-        if (isMuted)
-          FlatButton.icon(
-            onPressed: () => mute(false),
-            icon: Icon(Icons.headset, color: Colors.cyan),
-            label: Text('Unmute', style: TextStyle(color: Colors.cyan)),
-          ),
-      ],
     );
   }
 
@@ -776,100 +656,166 @@ class _AudioAppPageState extends State<AudioAppPage> {
   Widget _buildViewPage() {
     return Container(
       height: 500,
-      child: StreamBuilder<QuerySnapshot>(
-        stream: Firestore.instance.collection(colName).snapshots(),
-        builder: (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
-          if (snapshot.hasError) {
-            return Text("Error: ${snapshot.error}");
-          }
-          switch (snapshot.connectionState) {
-            case ConnectionState.waiting:
-              return Text("Loading");
-            default:
-              return ListView(
-                children:
-                    snapshot.data.documents.map((DocumentSnapshot document) {
-                  return Card(
-                    color: themeColor,
-                    elevation: 2,
-                    child: InkWell(
-                      onTap: () {
-                        // showDocument(document.documentID);
-                        kUrl = document["musicurl"];
-                        print(kUrl);
-                        setState(() {
-                          playTitle = document["title"];
-                          playSinger = document["writer"];
-                          playAvatar = document["avatarimage"];
-                          homeButtonState = false;
-                          musicButtonState = false;
-                          listButtonState = true;
-                          moreButtonState = false;
-                          pageIndex = 2;
-                        });
-                      },
-                      onLongPress: () {},
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        child: Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(10.0),
+      child: playing
+          ? Container(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "지금 재생중인 청춘은 ♬",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white, fontSize: 15),
+                  ),
+                  SizedBox(
+                    height: 7,
+                  ),
+                  Card(
+                    elevation: 4.0,
+                    child: Container(
+                      height: 200,
+                      width: 200,
+                      color: Colors.white,
+                      child:
+                          Image(fit: BoxFit.fill, image: NetworkImage(playImg)),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 60,
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CupertinoButton(
+                          child: Icon(
+                            starState ? Icons.star : Icons.star_border,
+                            size: 20,
+                            color: Colors.yellow[600],
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              starState = !starState;
+                            });
+                          }),
+                      Text(
+                        playSinger,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white, fontSize: 15),
+                      ),
+                    ],
+                  ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  Text(
+                    playTitle,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white, fontSize: 20),
+                  ),
+                ],
+              ),
+            )
+          : StreamBuilder<QuerySnapshot>(
+              stream: Firestore.instance.collection(colName).snapshots(),
+              builder: (BuildContext context,
+                  AsyncSnapshot<QuerySnapshot> snapshot) {
+                if (snapshot.hasError) {
+                  return Text("Error: ${snapshot.error}");
+                }
+                switch (snapshot.connectionState) {
+                  case ConnectionState.waiting:
+                    return Text("Loading");
+                  default:
+                    return ListView(
+                      children: snapshot.data.documents
+                          .map((DocumentSnapshot document) {
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 0, 0, 5),
+                          child: Container(
+                            color: themeColor,
+                            child: InkWell(
+                              onTap: () {
+                                // showDocument(document.documentID);
+                                print(kUrl);
+                                setState(() {
+                                  kUrl = document["musicurl"];
+                                  print(kUrl);
+                                  playImg = document["coverimage"];
+                                  playTitle = document["title"];
+                                  playSinger = document["writer"];
+                                  playAvatar = document["avatarimage"];
+                                  homeButtonState = false;
+                                  musicButtonState = false;
+                                  listButtonState = true;
+                                  moreButtonState = false;
+                                  pageIndex = 2;
+                                });
+                              },
+                              onLongPress: () {},
                               child: Container(
-                                height: 200,
-                                child: Image(
-                                    fit: BoxFit.fill,
-                                    image:
-                                        NetworkImage(document["coverimage"])),
-                              ),
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: [
-                                SizedBox(
-                                  width: 10,
-                                ),
-                                CircleAvatar(
-                                  backgroundImage:
-                                      NetworkImage(document["avatarimage"]),
-                                  backgroundColor: Colors.white,
-                                ),
-                                SizedBox(
-                                  width: 10,
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                padding: const EdgeInsets.all(8),
+                                child: Column(
                                   children: [
-                                    Text(
-                                      document["title"],
-                                      style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                    Container(
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        document["writer"] +
-                                            " / " +
-                                            document["runningtime"],
-                                        style: TextStyle(color: Colors.white),
+                                    Padding(
+                                      padding: const EdgeInsets.all(10.0),
+                                      child: Container(
+                                        height: 200,
+                                        child: Image(
+                                            fit: BoxFit.fill,
+                                            image: NetworkImage(
+                                                document["coverimage"])),
                                       ),
-                                    )
+                                    ),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.start,
+                                      children: [
+                                        SizedBox(
+                                          width: 10,
+                                        ),
+                                        CircleAvatar(
+                                          backgroundImage: NetworkImage(
+                                              document["avatarimage"]),
+                                          backgroundColor: Colors.white,
+                                        ),
+                                        SizedBox(
+                                          width: 10,
+                                        ),
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              document["title"],
+                                              style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.bold),
+                                            ),
+                                            Container(
+                                              alignment: Alignment.centerLeft,
+                                              child: Text(
+                                                document["writer"] +
+                                                    " / " +
+                                                    document["runningtime"],
+                                                style: TextStyle(
+                                                    color: Colors.white),
+                                              ),
+                                            )
+                                          ],
+                                        ),
+                                      ],
+                                    ),
                                   ],
                                 ),
-                              ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              );
-          }
-        },
-      ),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                }
+              },
+            ),
     );
   }
 
@@ -985,21 +931,319 @@ class _AudioAppPageState extends State<AudioAppPage> {
   }
 
   Widget _buildListPage() {
-    return pageIndex == 2
-        ? Container(
-            child: Text("data"),
-          )
-        : Container();
+    return Container(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 0, 0, 5),
+        child: Column(
+          children: [
+            playImg != ""
+                ? Container(
+                    color: themeColor,
+                    child: InkWell(
+                      onTap: () {
+                        // showDocument(document.documentID);
+                      },
+                      onLongPress: () {},
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
+                          children: [
+                            Container(
+                              child: Text(
+                                "현재 플레이리스트의 수록곡 정보입니다.",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 5,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(5.0),
+                              child: Container(
+                                height: 200,
+                                child: Image(
+                                    fit: BoxFit.fill,
+                                    image: NetworkImage(playImg)),
+                              ),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  width: 10,
+                                ),
+                                CircleAvatar(
+                                  backgroundImage: NetworkImage(playAvatar),
+                                  backgroundColor: Colors.white,
+                                ),
+                                SizedBox(
+                                  width: 10,
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      playTitle,
+                                      style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                    Container(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        playSinger + " / " + playRunningtime,
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                    )
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                : Container(
+                    child: Text(
+                      "선택된 앨범이 없습니다.",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+            SizedBox(
+              height: 5,
+            ),
+            Container(
+              margin: EdgeInsets.symmetric(vertical: 0.0),
+              height: 130.0,
+              child: ListView(
+                scrollDirection: Axis.vertical,
+                children: <Widget>[
+                  _buildListTile(
+                    index: 1,
+                    title: "Girls Like You",
+                    singer: "Maroon 5",
+                    imageUrl:
+                        "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FMaroon%205%20-%20%20Girls%20Like%20You.png?alt=media&token=c0915d6e-2cf6-44df-9bfc-fbccb93b2348",
+                  ),
+                  _buildListTile(
+                    index: 2,
+                    title: "I Do",
+                    singer: "John Legend",
+                    imageUrl:
+                        "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FJohn%20Legend%20-%20I%20Do.jpg?alt=media&token=b67e1f3a-c256-4b6e-b4e7-60080d34a266",
+                  ),
+                  _buildListTile(
+                    index: 3,
+                    title: "Forgive Myself",
+                    singer: "Griff",
+                    imageUrl:
+                        "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FGriff%20-%20Forgive%20Myself.jpg?alt=media&token=81005c7e-47b8-4038-a952-3e3e5b4f67c4",
+                  ),
+                  _buildListTile(
+                    index: 4,
+                    title: "Rain On Me",
+                    singer: "Lady Gaga, Ariana Grande",
+                    imageUrl:
+                        "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FLady%20Gaga%2C%20Ariana%20Grande%20-%20Rain%20On%20Me.png?alt=media&token=79799d23-a897-46ae-b51e-fe7173e42426",
+                  ),
+                  _buildListTile(
+                    index: 5,
+                    title: "Feel",
+                    singer: "Lindsey Lomis",
+                    imageUrl:
+                        "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FLindsey%20Lomis%20-%20Feel.jpg?alt=media&token=a7ab02e1-d041-499d-93b1-6a74e536bcec",
+                  ),
+                  // _buildListTile(index: 2),
+                  // _buildListTile(index: 3),
+                  // _buildListTile(index: 4),
+                  // _buildListTile(index: 5),
+                  // _buildListTile(index: 6),
+                ],
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListTile(
+      {int index, String title, String imageUrl, String singer}) {
+    return Card(
+      color: themeColor,
+      elevation: 0.0,
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundImage: NetworkImage(imageUrl),
+            backgroundColor: Colors.transparent,
+          ),
+          trailing: Icon(Icons.playlist_add, color: Colors.white),
+          title: Text(
+            "${index}. ${title}",
+            style: TextStyle(color: Colors.white),
+          ),
+          subtitle: Text(singer, style: TextStyle(color: Colors.white)),
+          onTap: () {
+            SnackbarManager.showSnackBar(scaffoldKey, "선택한 음원이 리스트에 담겼습니다.");
+          },
+        ),
+      ),
+    );
   }
 
   Widget _buildMorePage() {
     return Container(
-      child: RaisedButton(
-        onPressed: () {
-          AuthProvider().logOut();
-        },
-        child: Text("Logout"),
+      margin: EdgeInsets.symmetric(vertical: 0.0),
+      height: MediaQuery.of(context).size.height,
+      child: ListView(
+        scrollDirection: Axis.vertical,
+        children: <Widget>[
+          Container(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    Container(
+                      height: 150,
+                      child: Row(children: [
+                        MarqueeWidget(
+                          direction: Axis.horizontal,
+                          child: Text(
+                            "내가 만드는 순간",
+                            style: TextStyle(
+                              fontSize: 25,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        CupertinoButton(
+                            child: Icon(
+                              Icons.add_box,
+                              size: 100,
+                              color: Colors.white,
+                            ),
+                            onPressed: () {})
+                      ]),
+                    ),
+                  ],
+                ),
+                SizedBox(
+                  width: 5,
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(5.0),
+                  child: Container(
+                    height: 200,
+                    child:
+                        Image(fit: BoxFit.fill, image: NetworkImage(playImg)),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 10,
+                    ),
+                    CircleAvatar(
+                      backgroundImage: NetworkImage(playAvatar),
+                      backgroundColor: Colors.white,
+                    ),
+                    SizedBox(
+                      width: 10,
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          playTitle,
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold),
+                        ),
+                        Container(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            playSinger + " / " + playRunningtime,
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        )
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          _buildListTile(
+            index: 1,
+            title: "Girls Like You",
+            singer: "Maroon 5",
+            imageUrl:
+                "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FMaroon%205%20-%20%20Girls%20Like%20You.png?alt=media&token=c0915d6e-2cf6-44df-9bfc-fbccb93b2348",
+          ),
+          _buildListTile(
+            index: 2,
+            title: "I Do",
+            singer: "John Legend",
+            imageUrl:
+                "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FJohn%20Legend%20-%20I%20Do.jpg?alt=media&token=b67e1f3a-c256-4b6e-b4e7-60080d34a266",
+          ),
+          _buildListTile(
+            index: 3,
+            title: "Forgive Myself",
+            singer: "Griff",
+            imageUrl:
+                "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FGriff%20-%20Forgive%20Myself.jpg?alt=media&token=81005c7e-47b8-4038-a952-3e3e5b4f67c4",
+          ),
+          _buildListTile(
+            index: 4,
+            title: "Rain On Me",
+            singer: "Lady Gaga, Ariana Grande",
+            imageUrl:
+                "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FLady%20Gaga%2C%20Ariana%20Grande%20-%20Rain%20On%20Me.png?alt=media&token=79799d23-a897-46ae-b51e-fe7173e42426",
+          ),
+          _buildListTile(
+            index: 5,
+            title: "Feel",
+            singer: "Lindsey Lomis",
+            imageUrl:
+                "https://firebasestorage.googleapis.com/v0/b/digroove-f7a64.appspot.com/o/image%2FLindsey%20Lomis%20-%20Feel.jpg?alt=media&token=a7ab02e1-d041-499d-93b1-6a74e536bcec",
+          ),
+        ],
       ),
+      // RaisedButton(
+      //   onPressed: () {
+      //     AuthProvider().logOut();
+      //   },
+      //   child: Text("Logout"),
+      // ),
     );
+  }
+}
+
+class SnackbarManager {
+  static void showSnackBar(
+      GlobalKey<ScaffoldState> scaffoldKey, String message) {
+    scaffoldKey.currentState.showSnackBar(SnackBar(
+      content: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: TextStyle(color: Colors.white),
+      ),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(20))),
+      backgroundColor: Colors.black,
+      elevation: 6.0,
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 }
