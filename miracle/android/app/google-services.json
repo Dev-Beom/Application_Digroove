@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "343917428926",
+    "firebase_url": "https://digroove-f7a64.firebaseio.com",
+    "project_id": "digroove-f7a64",
+    "storage_bucket": "digroove-f7a64.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:343917428926:android:54714618d1ad4a8df5deef",
+        "android_client_info": {
+          "package_name": "com.example.miracle"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "343917428926-d7ies00q2t37k8lv28ocbh69kntnnjaq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.miracle",
+            "certificate_hash": "f1f4f731679b75c1851f3521e2f76582883998de"
+          }
+        },
+        {
+          "client_id": "343917428926-5d9ms2d9mtvk81auer2vfrpj06f2ggrg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBrDKwDztVEF3vJboxPJINp1yHeWdzEMlk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "343917428926-5d9ms2d9mtvk81auer2vfrpj06f2ggrg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
