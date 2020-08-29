@@ -35,6 +35,8 @@ dependencies:
   firebase_auth: ^0.16.1
   provider: ^3.0.0+1
   cloud_firestore: ^0.12.10
+  font_awesome_flutter: ^8.8.1
+  
 
 dev_dependencies:
   flutter_test:
@@ -56,6 +58,7 @@ flutter:
     - assets/images/background.png
     - assets/images/digrooveLogo.png
     - assets/images/equal.gif
+    - assets/images/deco.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware.
